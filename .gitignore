@@ -1,0 +1,48 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# === venv ===
+dl_env/
+venv/
+.venv/
+env/
+
+# === 模型 checkpoint / 权重（重新训能再有，不进 repo）===
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.h5
+*.onnx
+
+# === 预处理后的训练数据 (可重新生成) ===
+*.bin
+*.npy
+*.npz
+*.npy.gz
+
+# === 数据集（可重新下载，不进 repo）===
+data/
+**/data/
+
+# === 网文语料（版权问题，绝对不能 push）===
+day14/corpus/
+
+# === 训练日志 / 实验跟踪 ===
+*.log
+runs/
+wandb/
+lightning_logs/
+mlruns/
+tensorboard/
+
+# === IDE / OS ===
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
