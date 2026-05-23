@@ -27,14 +27,24 @@ set_target_properties(mujoco_lib PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "${MUJOCO_ROOT}/include"
 )
 
-# --- 3. 主程序 ---
+# --- 3. 主程序 (headless) ---
 add_executable(dqn_pendulum main.cpp)
 target_link_libraries(dqn_pendulum
     "${TORCH_LIBRARIES}"
     mujoco_lib
 )
-
-# Runtime rpath: 让 binary 跑时自动找 mujoco lib, 不依赖 LD_LIBRARY_PATH
 set_target_properties(dqn_pendulum PROPERTIES
+    BUILD_RPATH "${MUJOCO_ROOT}"
+)
+
+# --- 4. Viewer 版 (LibTorch + MuJoCo + GLFW GUI) ---
+find_package(glfw3 REQUIRED)
+add_executable(dqn_pendulum_viewer main_viewer.cpp)
+target_link_libraries(dqn_pendulum_viewer
+    "${TORCH_LIBRARIES}"
+    mujoco_lib
+    glfw
+)
+set_target_properties(dqn_pendulum_viewer PROPERTIES
     BUILD_RPATH "${MUJOCO_ROOT}"
 )
