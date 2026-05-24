@@ -690,6 +690,55 @@
 
 ---
 
+### #009 Fine action discretization in DQN ≠ smooth control 💡
+
+- **日期**：2026-05-24
+- **触发**：day10-16 系列实验, 想在 MuJoCo InvertedPendulum 上让杆"钉钉子"(居中 + 小幅 + 不抖)
+- **核心 finding（反直觉）**：DQN 把 action 从 3 个 (±3, 0) 加细到 31 个 (-3..+3 每 0.2) **几乎没改善 smoothness**, 仍然 bang-bang 行为
+- **完整实验链路**（day10 → day16, 全在 dl-box GPU）：
+  ```
+  day10  31 action + default reward (+1/step):       撑 1000 ✓  bang-bang
+  day11  + reward shape (10θ² penalty):              撑 1000 ✓  仍 bang-bang
+  day12  + θ_dot/x/x_dot 全维度 reward + 800k step:  撑住 ✓     贴右壁 (local opt)
+  day13  + x² 系数 0.05 → 0.3 + 1.5M step:           撑 1000 ✓  贴左壁 (mean|x|=0.86)
+  day14  Double DQN + du penalty + resume:           失败       Q stale + du 让 POMDP
+  day15 v2  from scratch + control-metric checkpoint: 早期 mean|x|=0.07 ⭐, 后期 collapse
+  day15 v3  lower lr + early stop:                   稳定但没找到强 policy
+  day15 sync5000  target_sync 500 → 5000:            居中 ✓ survive ✓ |u|=2.03 jitter ⭐ 当前最佳
+  day16  narrow action [-1.5,+1.5] step 0.1:        survive 崩 (力不够压扰动)
+  ```
+- **机制分析**：
+  - **Max operation 自我强化（#008 二次升级机制的 NN 版本）**: argmax Q(s, ·) 在 31 个 a 上做; Q 估计有 noise (NN approximation error); noise 量级 (~0.5-2) 大于邻近 fine action 的 Q 差距 (e.g. Q(s, 0.2) vs Q(s, 0.4) 差距 < 0.1); → argmax 在邻近 fine action 之间反复"翻转", 表现为 effective bang-bang
+  - **离散化粒度 marginal benefit ≈ 0**: 在 NN approximation error 下, 31 action vs 3 action 几乎等价
+  - **DQN max op 是本质限制**, 不是 hyperparameter 问题
+- **工程发现（值得记下）**：
+  - **Target sync interval 500 → 5000 是关键** (day15 实验): 让 bootstrap target 更稳定, 找到 centered policy
+  - **改 reward 后 resume 旧 Q 不可行** (day14 失败): Q 估值在新 reward 下 stale, fine-tune 不收敛
+  - **du penalty 必须 prev_u in state**: 否则 reward 依赖 hidden info → POMDP, NN 学不到
+  - **Reward shaping 的 local optimum**: x 系数小 (0.05) → policy 学到"贴壁"是 stable state (cart 撞壁后不再漂移, 杆稳定微倾)
+- **理论 takeaway**：要真正 smooth control 必须**离开 DQN max op 范式**, 用 policy gradient / actor-critic (continuous action 原生支持)
+- **与 #008 的关系**：
+  - #008 二次升级机制 (max + ε-greedy 自我强化) 在 tabular setting 揭示
+  - #009 是同机制在 deep RL + NN approximation 下的实证: noise 来源不同 (一个是 sample, 一个是 NN approx), 但机制同构
+  - → max op 是 DQN 范式的根本限制, 跨 tabular / deep 都成立
+- **对 #006 paper 的强支撑**：
+  - 给 paper 一个**反 DQN 的强 motivation**: "31-action discretization 在 InvertedPendulum 上仍 bang-bang, 离散化粒度的 marginal benefit 接近 0"
+  - 直接论证 paper 选 continuous action 算法 (SAC/DDPG/policy gradient) 而非 fine-discretization DQN 的必要性
+  - 可作 paper 的 Section 2 "Why naive solutions fail" 的实证
+- **当前最佳 policy**: `day15/trained_ddqn_center_sync5000_best.script.pt`
+  - mean|x| = 0.057 ✓ (居中)
+  - survive = 1000 ✓
+  - mean|u| = 2.03 (jitter, 待 SAC 解决)
+- **下一步**: 用户学完赵世钰 Ch.9 (Policy Gradient) 后实施 SAC / DDPG, 解决 bang-bang 根本问题
+- **paper-worthy 完整 story**：
+  - 第一幕 (#008): tabular setting, MC ≫ Sarsa, 揭示 max + ε-greedy 自我强化
+  - 第二幕 (#008 二次/三次升级): Q-learning(uniform) ≈ MC, behavior 解耦修复
+  - 第三幕 (#008 三次升级 FQI): 1/10 sample efficiency, generative model + iterative refinement
+  - 第四幕 (#009): deep RL + 31-action 仍 bang-bang, 揭示 max op 是范式根本限制
+  - 第五幕 (待写): continuous action algorithm (SAC) 真正解决问题
+
+---
+
 ## Meta 规则
 
 - 新条目默认状态 💡
